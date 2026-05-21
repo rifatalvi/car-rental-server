@@ -65,6 +65,11 @@ async function run() {
             const result = await carsCollection.find().toArray();
             res.json(result);
         })
+        app.get('/my-added-cars/:userId',async(req,res)=>{
+            const {userId} = req.params;
+            const result= await carsCollection.find({userId:userId}).toArray();
+            res.json(result);
+        })
         app.patch('/booking-cars/:carsId', verifYToken, async (req, res) => {
             try {
                 const { carsId } = req.params;
@@ -95,6 +100,7 @@ async function run() {
                 const result = await bookingCollection.insertOne({
                     ...carsData,
                     carId: new ObjectId(carsId),
+
                     bookingAt: new Date(),
                 });
 
@@ -104,21 +110,13 @@ async function run() {
                 res.status(500).json({ message: "Internal Server Error", error: error.message });
             }
         });
-     app.get('/booking-cars/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
 
-       
-        const result = await bookingCollection.find({ userId: id }).toArray();
-        
-        
-
-        res.send(result);
-    } catch (error) {
-        console.error("Error fetching user bookings:", error);
-        res.status(500).send({ message: "Internal Server Error" });
-    }
-});
+        app.get("/booking-cars/:userId",verifYToken, async (req, res) => {
+            const { userId } = req.params;
+            const result = await bookingCollection.find({ userId: userId }).toArray();
+            console.log(result);
+            res.json(result);
+        });
         app.post('/car', async (req, res) => {
             const car = req.body;
             const result = await carsCollection.insertOne(car);
@@ -129,6 +127,32 @@ async function run() {
             const result = await cars.toArray();
             res.json(result)
         })
+        app.get('/cars', async (req, res) => {
+            try {
+                const { search, type } = req.query;
+                let query = {};
+
+
+                if (search) {
+                    query.name = { $regex: search, $options: 'i' };
+                }
+
+
+                if (type) {
+
+                    query.type = { $regex: `^${type}$`, $options: 'i' };
+                }
+
+                console.log("Database Executing Query Details:", query);
+
+                const result = await carsCollection.find(query).toArray();
+                res.json(result);
+
+            } catch (error) {
+                console.error("Backend Error:", error);
+                res.status(500).json({ message: "Internal Server Error" });
+            }
+        });
         app.get('/cars/:id', verifYToken, async (req, res) => {
             const { id } = req.params;
             const result = await carsCollection.findOne({
