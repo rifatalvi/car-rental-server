@@ -7,17 +7,21 @@ const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const { createRemoteJWKSet, jwtVerify } = require('jose-cjs');
 dontenv.config()
-app.use(cors())
-app.use(express.json())
+
+app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true
+}));
+app.use(express.json());
 const uri = process.env.MONGODB_PRIVET_URL;
-  const JWKS = createRemoteJWKSet(
-      new URL('http://localhost:3000/api/auth/jwks'))
+const JWKS = createRemoteJWKSet(
+    new URL('http://localhost:3000/api/auth/jwks'))
 app.get('/', (req, res) => {
     res.send("hello world!")
 });
 
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -25,78 +29,112 @@ const client = new MongoClient(uri, {
         deprecationErrors: true,
     }
 });
-const verifYToken = async (req, res,next)=>{
-     const authorization = req.headers['authorization']
-     const token = authorization?.split(" ")[1];
-  
-  try {
-    const JWKS = createRemoteJWKSet(
-      new URL('http://localhost:3000/api/auth/jwks')
-    )
-    const { payload } = await jwtVerify(token, JWKS)
-    req.user = payload;
-    console.log(req.user);
-    next();
-  } catch (error) {
-    console.error('Token validation failed:', error)
-    return res.status(401).json({message: 'Unauthorize'})
-  }
+const verifYToken = async (req, res, next) => {
+    const authorization = req.headers['authorization']
+    const token = authorization?.split(" ")[1];
+
+    try {
+        const JWKS = createRemoteJWKSet(
+            new URL('http://localhost:3000/api/auth/jwks')
+        )
+        const { payload } = await jwtVerify(token, JWKS)
+        req.user = payload;
+        console.log(req.user);
+        next();
+    } catch (error) {
+        console.error('Token validation failed:', error)
+        return res.status(401).json({ message: 'Unauthorize' })
+    }
 }
 
 
 async function run() {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
+
         await client.connect();
-        // Send a ping to confirm a successful connection
+
         await client.db("admin").command({ ping: 1 });
         const db = client.db('cars-collection-db')
         const carsCollection = db.collection("cars")
         const bookingCollection = db.collection("booking")
         app.get('/hello', (req, res) => {
-            res.send({massege:"hello"})
+            res.send({ massege: "hello" })
         });
-         
-        app.get('/cars',async (req,res)=>{
-            const result= await carsCollection.find().toArray();
-            res.json(result);  
+
+        app.get('/cars', async (req, res) => {
+            const result = await carsCollection.find().toArray();
+            res.json(result);
         })
-        app.patch('/cars/:carsId', async (req, res)=>{
-            const {carsId} =req.params;
-            const carsData = req.body;
-            const cars = await carsCollection.findOne({
-                _id : new ObjectId(carsId)
-            });
-            if(!cars){
-                return res.status(404).json({message: 'cars are not found'})
-            }
-            await carsCollection.updateOne(
-                {
-                _id : new ObjectId(carsId)
-            },{
-                $inc:{bookingCount :1},
-                $set:{
-                    lastBookingAt: new Date(),
+        app.patch('/booking-cars/:carsId', verifYToken, async (req, res) => {
+            try {
+                const { carsId } = req.params;
+                const carsData = req.body;
+
+
+                if (!ObjectId.isValid(carsId)) {
+                    return res.status(400).json({ message: 'Invalid Car ID format' });
                 }
+
+                const cars = await carsCollection.findOne({
+                    _id: new ObjectId(carsId)
+                });
+
+                if (!cars) {
+                    return res.status(404).json({ message: 'cars are not found' });
+                }
+
+                await carsCollection.updateOne(
+                    { _id: new ObjectId(carsId) },
+                    {
+                        $inc: { bookingCount: 1 },
+                        $set: { lastBookingAt: new Date() }
+                    }
+                );
+
+
+                const result = await bookingCollection.insertOne({
+                    ...carsData,
+                    carId: new ObjectId(carsId),
+                    bookingAt: new Date(),
+                });
+
+                res.send(result);
+            } catch (error) {
+                console.error("PATCH Booking Error:", error);
+                res.status(500).json({ message: "Internal Server Error", error: error.message });
             }
-            )
-        })
-        app.post('/car', async(req , res)=>{
+        });
+     app.get('/booking-cars/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+       
+        const result = await bookingCollection.find({ userId: id }).toArray();
+        
+        
+
+        res.send(result);
+    } catch (error) {
+        console.error("Error fetching user bookings:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+    }
+});
+        app.post('/car', async (req, res) => {
             const car = req.body;
             const result = await carsCollection.insertOne(car);
             res.json(result);
         });
-        app.get('/feature',async ( req,res)=>{
-            const cars =carsCollection.find().limit(4);
-            const result = await  cars.toArray();
+        app.get('/feature', async (req, res) => {
+            const cars = carsCollection.find().limit(4);
+            const result = await cars.toArray();
             res.json(result)
         })
-        app.get('/cars/:id',verifYToken, async (req,res)=>{
-            const {id} = req.params;
-               const result =  await carsCollection.findOne({
+        app.get('/cars/:id', verifYToken, async (req, res) => {
+            const { id } = req.params;
+            const result = await carsCollection.findOne({
                 _id: new ObjectId(id)
-               })
-               res.json(result)
+            })
+            res.json(result)
         })
 
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
