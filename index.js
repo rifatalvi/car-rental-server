@@ -58,16 +58,16 @@ async function run() {
         const carsCollection = db.collection("cars")
         const bookingCollection = db.collection("booking")
         app.get('/hello', (req, res) => {
-            res.send({ massege: "hello" })
+            res.send({ message: "hello" })
         });
 
         app.get('/cars', async (req, res) => {
             const result = await carsCollection.find().toArray();
             res.json(result);
         })
-        app.get('/my-added-cars/:userId',async(req,res)=>{
-            const {userId} = req.params;
-            const result= await carsCollection.find({userId:userId}).toArray();
+        app.get('/my-added-cars/:userId', async (req, res) => {
+            const { userId } = req.params;
+            const result = await carsCollection.find({ userId: userId }).toArray();
             res.json(result);
         })
         app.patch('/booking-cars/:carsId', verifYToken, async (req, res) => {
@@ -111,7 +111,7 @@ async function run() {
             }
         });
 
-        app.get("/booking-cars/:userId",verifYToken, async (req, res) => {
+        app.get("/booking-cars/:userId", verifYToken, async (req, res) => {
             const { userId } = req.params;
             const result = await bookingCollection.find({ userId: userId }).toArray();
             console.log(result);
@@ -125,6 +125,26 @@ async function run() {
         app.get('/feature', async (req, res) => {
             const cars = carsCollection.find().limit(4);
             const result = await cars.toArray();
+            res.json(result)
+        })
+        
+        app.delete('/my-added-cars/:id', async (req, res) => {
+            const id = req.params.id;
+            const result = await carsCollection.deleteOne({
+                _id: new ObjectId(id)
+            })
+            res.json(result)
+
+        })
+        app.patch("/updated-cars/:id", async (req, res) => {
+            const id = req.params.id;
+            const updatedCarsData = req.body;
+            const result = await carsCollection.updateOne(
+                {
+                    _id: new ObjectId(id)
+                }, {
+                $set: updatedCarsData
+            })
             res.json(result)
         })
         app.get('/cars', async (req, res) => {
