@@ -141,7 +141,7 @@ app.post('/car', async (req, res) => {
     res.json(result);
 });
 
-app.get('/feature',verifYToken, async (req, res) => {
+app.get('/feature', async (req, res) => {
     const result = await req.carsCollection.find().limit(4).toArray();
     res.json(result);
 });
