@@ -127,7 +127,7 @@ async function run() {
             const result = await cars.toArray();
             res.json(result)
         })
-        
+
         app.delete('/my-added-cars/:id', async (req, res) => {
             const id = req.params.id;
             const result = await carsCollection.deleteOne({
@@ -136,6 +136,35 @@ async function run() {
             res.json(result)
 
         })
+        app.get('/search', async (req, res) => {
+            try {
+                const { search, type } = req.query;
+                let queryObj = {};
+
+
+                if (search) {
+                    queryObj.$or = [
+                        {
+                            carName: { $regex: search, $options: 'i' }
+                        },
+                        { carType: { $regex: search, $options: 'i' } }
+                    ];
+                }
+
+
+                if (type) {
+                    queryObj.carType = { $regex: `^${type}$`, $options: 'i' };
+                }
+
+                const cursor = carsCollection.find(queryObj);
+                const result = await cursor.toArray();
+
+                res.send(result);
+            } catch (error) {
+                console.error("Search Error:", error);
+                res.status(500).send({ message: "Internal server error" });
+            }
+        });
         app.patch("/updated-cars/:id", async (req, res) => {
             const id = req.params.id;
             const updatedCarsData = req.body;
@@ -147,32 +176,7 @@ async function run() {
             })
             res.json(result)
         })
-        app.get('/cars', async (req, res) => {
-            try {
-                const { search, type } = req.query;
-                let query = {};
 
-
-                if (search) {
-                    query.name = { $regex: search, $options: 'i' };
-                }
-
-
-                if (type) {
-
-                    query.type = { $regex: `^${type}$`, $options: 'i' };
-                }
-
-                console.log("Database Executing Query Details:", query);
-
-                const result = await carsCollection.find(query).toArray();
-                res.json(result);
-
-            } catch (error) {
-                console.error("Backend Error:", error);
-                res.status(500).json({ message: "Internal Server Error" });
-            }
-        });
         app.get('/cars/:id', verifYToken, async (req, res) => {
             const { id } = req.params;
             const result = await carsCollection.findOne({
